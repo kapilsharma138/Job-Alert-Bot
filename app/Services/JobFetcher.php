@@ -13,6 +13,7 @@ class JobFetcher
 
         $jobs = array_merge($jobs, $this->fetchLaraJobs());
         $jobs = array_merge($jobs, $this->fetchRemotive());
+        $jobs = array_merge($jobs, $this->fetchRemoteOk());
 
         return $jobs;
     }
@@ -20,19 +21,25 @@ class JobFetcher
     private function fetchLaraJobs(): array
     {
         try {
-            $response = Http::timeout(15)->get('https://larajobs.com/feed');
 
-            if (!$response->successful()) return [];
+            $response = Http::timeout(15)
+                ->get('https://larajobs.com/feed');
 
-            $xml  = simplexml_load_string($response->body());
+            if (!$response->successful()) {
+                return [];
+            }
+
+            $xml = simplexml_load_string($response->body());
+
             $jobs = [];
 
             foreach ($xml->channel->item as $item) {
+
                 $jobs[] = [
-                    'title'   => (string) $item->title,
-                    'company' => (string) $item->children('dc', true)->creator ?? 'Unknown',
-                    'link'    => (string) $item->link,
-                    'desc'    => strip_tags((string) $item->description),
+                    'title'   => (string)$item->title,
+                    'company' => (string)$item->children('dc', true)->creator ?: 'Unknown',
+                    'link'    => (string)$item->link,
+                    'desc'    => strip_tags((string)$item->description),
                     'source'  => 'LaraJobs',
                 ];
             }
@@ -40,7 +47,9 @@ class JobFetcher
             return $jobs;
 
         } catch (\Exception $e) {
-            Log::warning('LaraJobs fetch failed: ' . $e->getMessage());
+
+            Log::warning('LaraJobs failed: '.$e->getMessage());
+
             return [];
         }
     }
@@ -48,19 +57,31 @@ class JobFetcher
     private function fetchRemotive(): array
     {
         try {
-            $response = Http::timeout(15)->get('https://remotive.com/api/remote-jobs', [
-                'category' => 'software-dev',
-                'limit'    => 50,
-            ]);
 
-            if (!$response->successful()) return [];
+            $response = Http::timeout(15)
+                ->get('https://remotive.com/api/remote-jobs', [
+                    'category' => 'software-dev'
+                ]);
+
+            if (!$response->successful()) {
+                return [];
+            }
 
             $jobs = [];
 
             foreach ($response->json('jobs', []) as $job) {
-                // filter PHP/Laravel relevant only
-                $text = strtolower($job['title'] . ' ' . $job['description']);
-                if (!str_contains($text, 'php') && !str_contains($text, 'laravel') && !str_contains($text, 'backend')) {
+
+                $text = strtolower(
+                    ($job['title'] ?? '') .
+                    ' ' .
+                    strip_tags($job['description'] ?? '')
+                );
+
+                if (
+                    !str_contains($text, 'php') &&
+                    !str_contains($text, 'laravel') &&
+                    !str_contains($text, 'backend')
+                ) {
                     continue;
                 }
 
@@ -76,7 +97,60 @@ class JobFetcher
             return $jobs;
 
         } catch (\Exception $e) {
-            Log::warning('Remotive fetch failed: ' . $e->getMessage());
+
+            Log::warning('Remotive failed: '.$e->getMessage());
+
+            return [];
+        }
+    }
+
+    private function fetchRemoteOk(): array
+    {
+        try {
+
+            $response = Http::timeout(15)
+                ->get('https://remoteok.com/api');
+
+            if (!$response->successful()) {
+                return [];
+            }
+
+            $jobs = [];
+
+            foreach ($response->json() as $job) {
+
+                if (!isset($job['position'])) {
+                    continue;
+                }
+
+                $text = strtolower(
+                    ($job['position'] ?? '') .
+                    ' ' .
+                    implode(' ', $job['tags'] ?? [])
+                );
+
+                if (
+                    !str_contains($text, 'php') &&
+                    !str_contains($text, 'laravel')
+                ) {
+                    continue;
+                }
+
+                $jobs[] = [
+                    'title'   => $job['position'],
+                    'company' => $job['company'] ?? 'Unknown',
+                    'link'    => $job['url'] ?? '',
+                    'desc'    => implode(', ', $job['tags'] ?? []),
+                    'source'  => 'RemoteOK',
+                ];
+            }
+
+            return $jobs;
+
+        } catch (\Exception $e) {
+
+            Log::warning('RemoteOK failed: '.$e->getMessage());
+
             return [];
         }
     }

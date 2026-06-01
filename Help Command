@@ -1,0 +1,5 @@
+// To Test on local
+Use Command: php artisan telegram:listen // This Allows you to make bot active even on localhost
+
+// To send job via CLI
+Use Command: php artisan jobs:fetch
