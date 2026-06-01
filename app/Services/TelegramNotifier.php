@@ -33,4 +33,23 @@ class TelegramNotifier
             return false;
         }
     }
+
+    // public function send(string $message): bool
+    // {
+    //     try {
+    //         $response = Http::withoutVerifying()  // ← add this
+    //             ->post("https://api.telegram.org/bot{$this->token}/sendMessage", [
+    //                 'chat_id'    => $this->chatId,
+    //                 'text'       => $message,
+    //                 'parse_mode' => 'HTML',
+    //                 'disable_web_page_preview' => true,
+    //             ]);
+
+    //         return $response->successful();
+
+    //     } catch (\Exception $e) {
+    //         Log::error('Telegram send failed: ' . $e->getMessage());
+    //         return false;
+    //     }
+    // }
 }
