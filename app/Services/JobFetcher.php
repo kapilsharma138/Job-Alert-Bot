@@ -21,7 +21,6 @@ class JobFetcher
     {
         try {
             $response = Http::timeout(15)->get('https://larajobs.com/feed');
-            // $response = Http::withoutVerifying()->timeout(15)->get('https://larajobs.com/feed');
 
             if (!$response->successful()) return [];
 
@@ -50,7 +49,6 @@ class JobFetcher
     {
         try {
             $response = Http::timeout(15)->get('https://remotive.com/api/remote-jobs', [
-            // $response = Http::withoutVerifying()->timeout(15)->get('https://remotive.com/api/remote-jobs', [
                 'category' => 'software-dev',
                 'limit'    => 50,
             ]);
