@@ -14,6 +14,7 @@ class JobFetcher
         $jobs = array_merge($jobs, $this->fetchLaraJobs());
         $jobs = array_merge($jobs, $this->fetchRemotive());
         $jobs = array_merge($jobs, $this->fetchRemoteOk());
+        $jobs = array_merge($jobs, $this->fetchCutshort());
 
         return $jobs;
     }
@@ -71,15 +72,12 @@ class JobFetcher
 
             foreach ($response->json('jobs', []) as $job) {
 
-                $text = strtolower(
-                    ($job['title'] ?? '') .
-                    ' ' .
-                    strip_tags($job['description'] ?? '')
-                );
+                $text = strtolower($job['title'] . ' ' . strip_tags($job['description'] ?? ''));
 
                 if (
-                    !str_contains($text, 'php') &&
+                    !str_contains($text, 'php')     &&
                     !str_contains($text, 'laravel') &&
+                    !str_contains($text, 'node')    &&
                     !str_contains($text, 'backend')
                 ) {
                     continue;
@@ -108,7 +106,8 @@ class JobFetcher
     {
         try {
 
-            $response = Http::timeout(15)
+            $response = Http::withoutVerifying()
+                ->timeout(15)
                 ->get('https://remoteok.com/api');
 
             if (!$response->successful()) {
@@ -151,6 +150,46 @@ class JobFetcher
 
             Log::warning('RemoteOK failed: '.$e->getMessage());
 
+            return [];
+        }
+    }
+
+    private function fetchCutshort(): array
+    {
+        try {
+            // Cutshort public API v2
+            $response = Http::withoutVerifying()
+                ->timeout(15)
+                ->withHeaders([
+                    'Accept' => 'application/json',
+                    'User-Agent' => 'Mozilla/5.0',
+                ])
+                ->get('https://cutshort.io/api/v2/jobs', [
+                    'q'      => 'PHP Laravel',
+                    'limit'  => 20,
+                    'offset' => 0,
+                ]);
+
+            if (!$response->successful()) {
+                Log::warning('Cutshort returned: ' . $response->status());
+                return [];
+            }
+
+            $jobs = [];
+            foreach ($response->json('data', []) as $job) {
+                $jobs[] = [
+                    'title'   => $job['title'] ?? 'Unknown',
+                    'company' => $job['company']['name'] ?? $job['companyName'] ?? 'Unknown',
+                    'link'    => 'https://cutshort.io/job/' . ($job['slug'] ?? $job['_id'] ?? ''),
+                    'desc'    => strip_tags($job['description'] ?? $job['about'] ?? ''),
+                    'source'  => 'Cutshort',
+                ];
+            }
+
+            return $jobs;
+
+        } catch (\Exception $e) {
+            Log::warning('Cutshort fetch failed: ' . $e->getMessage());
             return [];
         }
     }

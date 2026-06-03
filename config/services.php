@@ -40,4 +40,8 @@ return [
         'chat_id' => env('TELEGRAM_CHAT_ID'),
     ],
 
+    'jobs' => [
+        'min_salary_lpa' => env('JOB_MIN_SALARY_LPA', 0),
+    ],
+
 ];
